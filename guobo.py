@@ -37,9 +37,3 @@ for url in urls:
         print(title,size,year)
         with open(f'D:/project/ParsePDF-master/中国国家博物馆/{year}-{title}-{size}.jpg'.replace('\n',''), 'wb') as f:
             f.write(requests.get(img_url).content)
-
-
-
-
-
-
