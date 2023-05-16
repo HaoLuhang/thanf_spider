@@ -1,39 +1,37 @@
 # -*- coding: utf-8 -*-
-
+import multiprocessing
 import requests
-from bs4 import BeautifulSoup
-urls = [
-    'https://www.chnmuseum.cn/zp/zpml/csp/yq/index_2.shtml',
-    'https://www.chnmuseum.cn/zp/zpml/csp/yq/index_3.shtml',
-    'https://www.chnmuseum.cn/zp/zpml/csp/yq/index_4.shtml',
-]
-headers= {
-    'Cookie': '__jsluid_s=6b59c719fda526aa92bf9a3f3a0b2416; _trs_uv=l9p8m8b2_2797_hhfa; Hm_lvt_d8512e191052092ef1dd135588660448=1666764616,1667977776; _trs_ua_s_1=la9awhak_2797_1ike; __jsl_clearance_s=1667981468.001|0|t2CLFw85KNmzBstA4R%2BveDr%2ByPA%3D; Hm_lpvt_d8512e191052092ef1dd135588660448=1667981538',
-    'Host': 'www.chnmuseum.cn',
-    'Referer': 'https://www.chnmuseum.cn/zp/zpml/csp/yq/index_4.shtml',
-    'sec-ch-ua': '" Not;A Brand";v="99", "Google Chrome";v="91", "Chromium";v="91"',
-    'sec-ch-ua-mobile': '?0',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'same-origin',
-    'Sec-Fetch-User': '?1',
-    'Upgrade-Insecure-Requests': '1',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36'
-}
-for url in urls:
-    req = requests.get(url,headers=headers)
-    print(req)
-    soup = BeautifulSoup(req.text, "lxml")
-    for img in soup.find('ul',class_='cj_com_zhanchu cj_mb20').find_all('dd'):
-        img_url = img.parent.find('dt').find('a').find('img').get('src').replace('..','https://www.chnmuseum.cn/zp/zpml/csp')
-        year = img.find('span').get('ndtem').strip().replace('\u3000','')
-        if not year:
-            year = img.find('span').get('cpsdtem').strip().replace('\u3000','')
-        iurl = img.find('a').get('href').replace('..','https://www.chnmuseum.cn/zp/zpml/csp')
-        r = requests.get(iurl,headers=headers)
-        soup = BeautifulSoup(r.text, "lxml")
-        title = soup.find('div', class_='cj_ertitlere').string.strip()
-        size = soup.find('div', class_='cj_e_canshu').find('p').string
-        print(title,size,year)
-        with open(f'D:/project/ParsePDF-master/中国国家博物馆/{year}-{title}-{size}.jpg'.replace('\n',''), 'wb') as f:
-            f.write(requests.get(img_url).content)
+
+
+def get_img(name):
+    f_name = f"分类：{name['classification']}年代：{name['period']}名称：{name['title']}尺寸：{name['dimensions']}"
+    print(name)
+    with open('D:/project/ParsePDF-master/大都会艺术博物馆/' + f_name.replace('.', '·').replace('/', '~').replace('\r',
+                                                                                                                  '').replace(
+            '\n', '').replace('?', '') + '.jpg', 'wb') as f:
+        f.write(requests.get(name['primaryImage']).content)
+
+if __name__ == "__main__":
+    for page in range(5000,12440,40):
+        print(page)
+        try:
+            urls = f'https://www.metmuseum.org/mothra/collectionlisting/search?showOnly=withImage&department=6&geolocation=China&offset={page}&perPage=40'
+            req = requests.get(urls)
+            pool = multiprocessing.Pool(processes=8)
+
+            for i in (req.json()['results']):
+                try:
+                    id = i['url'].split('?')[0].split('/')[-1]
+                    name = requests.get('https://collectionapi.metmuseum.org/public/collection/v1/objects/'+id).json()
+                    if name['primaryImage'] == '':
+                        continue
+                    print(name)
+                    p = pool.apply_async(get_img, (name,))
+                except Exception as e:
+                    print('error info :',e)
+            pool.close()
+            pool.join()
+        except Exception as e:
+            print(e)
+            continue
+
